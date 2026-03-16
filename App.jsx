@@ -1,5 +1,687 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 
+// ─── FLOATING RUNE FIELD ─────────────────────────────────────────────────────
+function RuneField({ count = 30, opacity = 0.06 }) {
+  const runes = useRef(
+    Array.from({ length: count }, () => ({
+      glyph: RUNES[Math.floor(Math.random() * RUNES.length)],
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 10 + Math.random() * 22,
+      color: [C.purple, C.pink, C.gold, C.blue, C.green][Math.floor(Math.random() * 5)],
+      dur: 10 + Math.random() * 16,
+      delay: Math.random() * 10,
+    }))
+  ).current;
+
+  return (
+    <div style={{ position:"absolute", inset:0, pointerEvents:"none", overflow:"hidden" }}>
+      {runes.map((r, i) => (
+        <div key={i} style={{
+          position:"absolute", left:`${r.x}%`, top:`${r.y}%`,
+          fontSize:r.size, color:r.color, opacity,
+          userSelect:"none", fontFamily:"monospace",
+          animation:`floatRune ${r.dur}s ${r.delay}s ease-in-out infinite`,
+        }}>{r.glyph}</div>
+      ))}
+    </div>
+  );
+}
+
+// ─── SECTION DIVIDER ─────────────────────────────────────────────────────────
+function Divider({ color = C.purple }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:16, margin:"0 auto", maxWidth:200 }}>
+      <div style={{ flex:1, height:1, background:`linear-gradient(90deg, transparent, ${color}44)` }} />
+      <span style={{ color, fontSize:14, opacity:0.6 }}>✦</span>
+      <div style={{ flex:1, height:1, background:`linear-gradient(90deg, ${color}44, transparent)` }} />
+    </div>
+  );
+}
+
+// ─── FEATURE CARD ─────────────────────────────────────────────────────────────
+function FeatureCard({ icon, title, desc, color, live }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? `${color}08` : C.surface,
+        border:`1px solid ${hovered ? color+"44" : C.border}`,
+        borderRadius:16, padding:"24px 22px",
+        transition:"all 0.3s ease",
+        cursor:"default",
+        position:"relative",
+        overflow:"hidden",
+      }}>
+      {live && (
+        <div style={{
+          position:"absolute", top:14, right:14,
+          background:`${C.green}18`, border:`1px solid ${C.green}44`,
+          borderRadius:20, padding:"3px 10px",
+          fontSize:8, color:C.green, fontFamily:"monospace", letterSpacing:2,
+        }}>✓ LIVE</div>
+      )}
+      <div style={{ fontSize:28, marginBottom:14 }}>{icon}</div>
+      <div style={{ fontSize:15, color:hovered ? color : C.text, fontStyle:"italic",
+        fontFamily:"Georgia,serif", marginBottom:8, transition:"color 0.3s" }}>{title}</div>
+      <div style={{ fontSize:12, color:C.textMid, lineHeight:1.8 }}>{desc}</div>
+      {hovered && (
+        <div style={{
+          position:"absolute", bottom:0, left:0, right:0, height:2,
+          background:`linear-gradient(90deg, transparent, ${color}, transparent)`,
+        }}/>
+      )}
+    </div>
+  );
+}
+
+// ─── ROADMAP CARD ─────────────────────────────────────────────────────────────
+function RoadmapCard({ icon, title, desc, color, tag }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? `${color}06` : C.surface,
+        border:`1px solid ${hovered ? color+"33" : C.border}`,
+        borderRadius:16, padding:"22px 20px",
+        transition:"all 0.3s ease",
+        position:"relative", overflow:"hidden",
+      }}>
+      <div style={{
+        position:"absolute", top:14, right:14,
+        background:`${color}14`, border:`1px solid ${color}30`,
+        borderRadius:20, padding:"3px 10px",
+        fontSize:8, color, fontFamily:"monospace", letterSpacing:2,
+      }}>{tag}</div>
+      <div style={{ fontSize:24, marginBottom:12 }}>{icon}</div>
+      <div style={{ fontSize:14, color: hovered ? color : C.text, fontStyle:"italic",
+        fontFamily:"Georgia,serif", marginBottom:7, transition:"color 0.3s", paddingRight:60 }}>{title}</div>
+      <div style={{ fontSize:12, color:C.textMid, lineHeight:1.8 }}>{desc}</div>
+    </div>
+  );
+}
+
+// ─── STAT BADGE ───────────────────────────────────────────────────────────────
+function StatBadge({ value, label, color }) {
+  return (
+    <div style={{ textAlign:"center", padding:"16px 24px" }}>
+      <div style={{ fontSize:32, color, fontFamily:"monospace", fontWeight:"bold",
+        textShadow:`0 0 20px ${color}66` }}>{value}</div>
+      <div style={{ fontSize:10, color:C.textMid, fontFamily:"monospace",
+        letterSpacing:2, marginTop:4 }}>{label}</div>
+    </div>
+  );
+}
+
+// ─── MAIN LANDING PAGE ────────────────────────────────────────────────────────
+function LandingPage({ onEnter }) {
+  const [visible, setVisible] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 100);
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { clearTimeout(t); window.removeEventListener("scroll", onScroll); };
+  }, []);
+
+  const LIVE_FEATURES = [
+    { icon:"⚗️", color:C.purple, title:"The Spell Builder", tag:true,
+      desc:"Five layers of structured prompt architecture — Anchor, Feeling, Voice, Constraint, Permission. Build prompts that hit, not miss." },
+    { icon:"◈", color:C.pink, title:"The Codex", tag:true,
+      desc:"A library of master spells across Language Models and Image Generation. Load, remix, and save your own alongside the classics." },
+    { icon:"✦", color:C.gold, title:"Quality Checker", tag:true,
+      desc:"Real-time scoring across four dimensions. Know before you cast whether your spell is ready — or needs more power." },
+    { icon:"🏆", color:C.orange, title:"XP & Rank System", tag:true,
+      desc:"50 levels from Apprentice to Merlin. Every spell cast, saved, and mastered earns you XP. The Playground rewards the curious." },
+    { icon:"🧙", color:C.green, title:"Wizard Profiles", tag:true,
+      desc:"Your avatar, your handle, your rank. A wizard's identity follows them through the Playground — and soon, beyond it." },
+    { icon:"🌀", color:C.blue, title:"Image Mode Detection", tag:true,
+      desc:"The Spell Builder detects when you're building for image generation and reshapes itself — same layers, different alchemy." },
+  ];
+
+  const ROADMAP = [
+    { icon:"📜", color:C.purple, tag:"COMING NEXT",
+      title:"The Grimoire",
+      desc:"Merlin's complete library of lessons on prompt engineering. Chapters, exercises, and incantations that teach through doing. The curriculum lives inside the Playground itself." },
+    { icon:"🎓", color:C.pink, tag:"COMING NEXT",
+      title:"Courses & Learning Paths",
+      desc:"Four full courses — The AI Spellbook, Bottle Your Brilliance, Prompting Mastery, and Demystify AI. Structured learning with badges, completions, and XP rewards for every lesson." },
+    { icon:"🗺️", color:C.gold, tag:"COMING NEXT",
+      title:"Merlin's School of Wizardry",
+      desc:"A fully gamified learning world. Classrooms. Study halls. Quests. Challenge rooms. The entire Playground reimagined as a school where every lesson is an adventure." },
+    { icon:"🌐", color:C.green, tag:"THE COMMONS",
+      title:"The Spell Exchange",
+      desc:"Share your best spells with the community. Discover what other wizards are casting. Rate, remix, and build on each other's work. The collective spellbook, written by all." },
+    { icon:"💬", color:C.blue, tag:"THE COMMONS",
+      title:"The Wizards' Hall",
+      desc:"Where practitioners gather. Post what you're learning, share your AI creations, ask questions, show your results. A community built around prompt craft — not just content." },
+    { icon:"🔥", color:C.orange, tag:"THE COMMONS",
+      title:"Community Challenges",
+      desc:"Weekly prompting challenges with themes, judging, and prizes. The Playground sets the brief — the wizards answer the call. Rankings, spotlights, and hall-of-fame spells." },
+    { icon:"⚡", color:C.purple, tag:"POWER TOOLS",
+      title:"Prompt History",
+      desc:"Every spell you've ever cast, searchable and retrievable. See how your craft has evolved. Remix past work. Never lose a good incantation to a closed tab again." },
+    { icon:"🔮", color:C.pink, tag:"POWER TOOLS",
+      title:"Spell Chaining",
+      desc:"Build multi-step prompt sequences. Output flows into input. One cast triggers another. Complex AI workflows assembled in the Playground without a single line of code." },
+    { icon:"📱", color:C.gold, tag:"POWER TOOLS",
+      title:"Cross-Device Sync",
+      desc:"Your Codex, your XP, your rank — available on every device. Spells cast on mobile appear on desktop. The Playground follows you, not the other way around." },
+    { icon:"🎭", color:C.green, tag:"POWER TOOLS",
+      title:"Persona Vault",
+      desc:"Store your AI personas — the voices, roles, and characters you return to again and again. Pull them into any spell with one click. Your cast of characters, always ready." },
+    { icon:"📲", color:C.blue, tag:"PLATFORM",
+      title:"Mobile App",
+      desc:"iOS and Android. Cast spells from anywhere. The full Playground in your pocket — builder, codex, community, and courses. Native. Fast. Designed for thumbs." },
+    { icon:"🌍", color:C.orange, tag:"PLATFORM",
+      title:"Public Wizard Profiles",
+      desc:"Your profile becomes a page. Share your rank, your best spells, your creations. A portfolio of your prompt craft, visible to the world — or only to the Playground." },
+  ];
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.text,
+      fontFamily:"Georgia,serif", overflowX:"hidden" }}>
+
+      <style>{`
+        @keyframes floatRune {
+          0%,100% { transform:translateY(0) rotate(0deg); opacity:0.5; }
+          50%      { transform:translateY(-20px) rotate(6deg); opacity:1; }
+        }
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(24px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes pulse {
+          0%,100% { opacity:0.6; }
+          50%      { opacity:1; }
+        }
+        @keyframes shimmer {
+          0%   { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes orbFloat {
+          0%,100% { transform:translateY(0px) scale(1); }
+          50%      { transform:translateY(-30px) scale(1.05); }
+        }
+        .land-btn-primary {
+          background: linear-gradient(135deg,#7b6cf6,#c084fc);
+          border: none; border-radius:12px; padding:16px 40px;
+          color:#fff; font-size:13px; cursor:pointer;
+          letter-spacing:2px; font-family:monospace;
+          transition:all 0.3s ease;
+          box-shadow: 0 0 30px rgba(167,139,250,0.3);
+        }
+        .land-btn-primary:hover {
+          transform:translateY(-2px);
+          box-shadow: 0 8px 40px rgba(167,139,250,0.5);
+        }
+        .land-btn-ghost {
+          background:transparent;
+          border:1px solid #262636; border-radius:12px; padding:16px 32px;
+          color:#56566e; font-size:12px; cursor:pointer;
+          letter-spacing:2px; font-family:monospace;
+          transition:all 0.25s ease;
+        }
+        .land-btn-ghost:hover {
+          border-color:#a78bfa44; color:#a78bfa;
+        }
+        .section-fade {
+          opacity:0; transform:translateY(20px);
+          animation:fadeUp 0.7s ease forwards;
+        }
+        * { box-sizing:border-box; }
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:#2a2a3a; border-radius:2px; }
+      `}</style>
+
+      {/* ── HERO ───────────────────────────────────────────────────────────── */}
+      <section ref={heroRef} style={{
+        minHeight:"100vh", position:"relative",
+        display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center",
+        padding:"80px 24px", textAlign:"center",
+        overflow:"hidden",
+      }}>
+        {/* Background orbs */}
+        <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
+          <div style={{ position:"absolute", top:"15%", left:"10%",
+            width:400, height:400, borderRadius:"50%",
+            background:"radial-gradient(circle, #a78bfa0a 0%, transparent 70%)",
+            animation:"orbFloat 12s ease-in-out infinite" }}/>
+          <div style={{ position:"absolute", bottom:"20%", right:"8%",
+            width:300, height:300, borderRadius:"50%",
+            background:"radial-gradient(circle, #f472b608 0%, transparent 70%)",
+            animation:"orbFloat 15s 3s ease-in-out infinite" }}/>
+          <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
+            width:600, height:600, borderRadius:"50%",
+            background:"radial-gradient(circle, #fbbf2405 0%, transparent 65%)" }}/>
+        </div>
+
+        <RuneField count={28} opacity={0.055} />
+
+        {/* Crest */}
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(30px)",
+          transition:"all 1s ease",
+          marginBottom:32,
+        }}>
+          <div style={{ fontSize:64, marginBottom:4,
+            filter:"drop-shadow(0 0 30px rgba(167,139,250,0.6))",
+            animation:"orbFloat 8s ease-in-out infinite" }}>⚗️</div>
+        </div>
+
+        {/* School name */}
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(20px)",
+          transition:"all 1s 0.2s ease",
+          marginBottom:10,
+        }}>
+          <div style={{ fontSize:11, color:C.textMid, fontFamily:"monospace",
+            letterSpacing:6, marginBottom:16 }}>
+            WELCOME TO
+          </div>
+          <h1 style={{
+            fontSize:"clamp(36px, 6vw, 76px)",
+            color:C.text,
+            fontStyle:"italic",
+            letterSpacing:"-2px",
+            lineHeight:1.1,
+            margin:0,
+            textShadow:"0 0 60px rgba(167,139,250,0.3), 0 0 120px rgba(167,139,250,0.1)",
+          }}>
+            Merlin's School
+          </h1>
+          <h1 style={{
+            fontSize:"clamp(36px, 6vw, 76px)",
+            background:"linear-gradient(135deg, #a78bfa, #f472b6, #fbbf24)",
+            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+            backgroundClip:"text",
+            fontStyle:"italic",
+            letterSpacing:"-2px",
+            lineHeight:1.1,
+            margin:"4px 0 0",
+          }}>
+            of Wizardry
+          </h1>
+        </div>
+
+        {/* Sub brand */}
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transition:"all 1s 0.4s ease",
+          marginBottom:12,
+        }}>
+          <div style={{ fontSize:13, color:C.textMid, letterSpacing:4,
+            fontFamily:"monospace", marginTop:8 }}>
+            ⚗️ WIZARDS PLAYGROUND · PROMPT STUDIO
+          </div>
+        </div>
+
+        {/* Tagline */}
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(16px)",
+          transition:"all 1s 0.55s ease",
+          marginBottom:52,
+        }}>
+          <p style={{
+            fontSize:"clamp(16px, 2.2vw, 22px)",
+            color:C.textMid,
+            lineHeight:1.8,
+            maxWidth:640,
+            margin:"24px auto 0",
+            fontStyle:"italic",
+          }}>
+            The world's first gamified school for prompt engineering — where spells are prompts,
+            lessons are quests, and every word you write brings you closer to Merlin.
+          </p>
+        </div>
+
+        {/* CTA */}
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(16px)",
+          transition:"all 1s 0.7s ease",
+          display:"flex", gap:14, flexWrap:"wrap", justifyContent:"center",
+        }}>
+          <button className="land-btn-primary" onClick={onEnter}>
+            ENTER THE PLAYGROUND ✦
+          </button>
+          <button className="land-btn-ghost" onClick={() => {
+            document.getElementById("what-is-this")?.scrollIntoView({ behavior:"smooth" });
+          }}>
+            LEARN MORE ↓
+          </button>
+        </div>
+
+        {/* Scroll nudge */}
+        <div style={{
+          position:"absolute", bottom:36, left:"50%", transform:"translateX(-50%)",
+          display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+          opacity:0.3, animation:"pulse 2.5s ease-in-out infinite",
+        }}>
+          <div style={{ fontSize:9, fontFamily:"monospace", letterSpacing:3, color:C.textMid }}>SCROLL</div>
+          <div style={{ fontSize:18, color:C.textMid }}>↓</div>
+        </div>
+      </section>
+
+      {/* ── WHAT IS THIS ────────────────────────────────────────────────────── */}
+      <section id="what-is-this" style={{
+        padding:"100px 24px", maxWidth:1000, margin:"0 auto",
+      }}>
+        <div style={{ textAlign:"center", marginBottom:64 }}>
+          <div style={{ fontSize:9, color:C.purple, fontFamily:"monospace",
+            letterSpacing:4, marginBottom:16 }}>THE SCHOOL</div>
+          <h2 style={{ fontSize:"clamp(28px,4vw,48px)", color:C.text,
+            fontStyle:"italic", margin:"0 0 20px", letterSpacing:"-1px" }}>
+            Words are spells.
+          </h2>
+          <p style={{ fontSize:16, color:C.textMid, lineHeight:1.9,
+            maxWidth:680, margin:"0 auto", fontStyle:"italic" }}>
+            Most people type at AI and hope. Wizards craft. Every prompt has architecture —
+            a structure beneath the surface that separates a weak request from a master incantation.
+            Wizards Playground is where you learn to build them, one layer at a time.
+          </p>
+        </div>
+
+        <Divider color={C.purple} />
+
+        <div style={{ marginTop:64, display:"grid",
+          gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:24 }}>
+          {[
+            { icon:"⊕", color:C.purple, title:"Not a chatbot. A craft.",
+              body:"The Playground doesn't talk to AI for you. It teaches you to talk to AI yourself — with precision, intention, and a voice that's unmistakably yours." },
+            { icon:"◈", color:C.pink, title:"Gamified from the ground up.",
+              body:"XP, ranks, quests, challenges, and a 50-level journey from Apprentice to Merlin. Learning prompt engineering should feel like levelling up — because it is." },
+            { icon:"◎", color:C.gold, title:"A school, not a tool.",
+              body:"Every feature teaches. The Spell Builder is a lesson. The Codex is a library. The Grimoire is the curriculum. The Playground is the classroom." },
+          ].map(({ icon, color, title, body }) => (
+            <div key={title} style={{ background:C.surface, border:`1px solid ${C.border}`,
+              borderRadius:16, padding:"28px 24px" }}>
+              <div style={{ fontSize:24, color, marginBottom:14 }}>{icon}</div>
+              <div style={{ fontSize:16, color:C.text, fontStyle:"italic",
+                fontFamily:"Georgia,serif", marginBottom:10 }}>{title}</div>
+              <div style={{ fontSize:13, color:C.textMid, lineHeight:1.8 }}>{body}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── STATS BAR ───────────────────────────────────────────────────────── */}
+      <section style={{
+        background:C.surface, borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`,
+        padding:"8px 24px",
+      }}>
+        <div style={{ maxWidth:900, margin:"0 auto",
+          display:"flex", justifyContent:"space-around",
+          flexWrap:"wrap", gap:8 }}>
+          <StatBadge value="50" label="LEVELS TO MASTER"   color={C.purple} />
+          <StatBadge value="5"  label="SPELL LAYERS"        color={C.pink} />
+          <StatBadge value="4"  label="COURSES COMING"      color={C.gold} />
+          <StatBadge value="∞"  label="SPELLS TO CAST"      color={C.green} />
+          <StatBadge value="1"  label="SCHOOL OF WIZARDRY"  color={C.orange} />
+        </div>
+      </section>
+
+      {/* ── LIVE NOW ────────────────────────────────────────────────────────── */}
+      <section style={{ padding:"100px 24px", maxWidth:1100, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:64 }}>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"6px 16px",
+            background:`${C.green}12`, border:`1px solid ${C.green}33`,
+            borderRadius:20, marginBottom:20 }}>
+            <span style={{ width:7, height:7, borderRadius:"50%",
+              background:C.green, display:"inline-block",
+              animation:"pulse 1.8s ease-in-out infinite" }}/>
+            <span style={{ fontSize:9, color:C.green, fontFamily:"monospace",
+              letterSpacing:3 }}>OPEN FOR ENROLMENT</span>
+          </div>
+          <h2 style={{ fontSize:"clamp(26px,3.5vw,44px)", color:C.text,
+            fontStyle:"italic", margin:"0 0 16px", letterSpacing:"-1px" }}>
+            What's in the Playground now
+          </h2>
+          <p style={{ fontSize:14, color:C.textMid, maxWidth:560,
+            margin:"0 auto", lineHeight:1.8 }}>
+            The school is open. The first rooms are lit. Enter today and begin your training.
+          </p>
+        </div>
+
+        <div style={{ display:"grid",
+          gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:20 }}>
+          {LIVE_FEATURES.map(f => (
+            <FeatureCard key={f.title} icon={f.icon} title={f.title}
+              desc={f.desc} color={f.color} live={f.tag} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── ROADMAP ─────────────────────────────────────────────────────────── */}
+      <section style={{
+        padding:"100px 24px",
+        background:`linear-gradient(180deg, ${C.bg} 0%, #0a0814 50%, ${C.bg} 100%)`,
+        position:"relative", overflow:"hidden",
+      }}>
+        <RuneField count={16} opacity={0.03} />
+        <div style={{ maxWidth:1100, margin:"0 auto", position:"relative" }}>
+
+          <div style={{ textAlign:"center", marginBottom:64 }}>
+            <div style={{ fontSize:9, color:C.gold, fontFamily:"monospace",
+              letterSpacing:4, marginBottom:16 }}>THE GRIMOIRE</div>
+            <h2 style={{ fontSize:"clamp(26px,3.5vw,44px)", color:C.text,
+              fontStyle:"italic", margin:"0 0 16px", letterSpacing:"-1px" }}>
+              Where we're going
+            </h2>
+            <p style={{ fontSize:14, color:C.textMid, maxWidth:580,
+              margin:"0 auto", lineHeight:1.8 }}>
+              The Playground is being built in the open. Every feature below is already in progress — and early wizards who join now help shape what gets built next.
+            </p>
+          </div>
+
+          {/* GRIMOIRE & COURSES */}
+          <div style={{ marginBottom:48 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ fontSize:9, color:C.purple, fontFamily:"monospace", letterSpacing:3 }}>
+                ◈ LEARN
+              </div>
+              <div style={{ flex:1, height:1, background:`linear-gradient(90deg, ${C.purple}33, transparent)` }} />
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+              {ROADMAP.filter(r => r.tag === "COMING NEXT").map(r => (
+                <RoadmapCard key={r.title} {...r} />
+              ))}
+            </div>
+          </div>
+
+          {/* COMMUNITY */}
+          <div style={{ marginBottom:48 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ fontSize:9, color:C.green, fontFamily:"monospace", letterSpacing:3 }}>
+                ◈ COMMUNE
+              </div>
+              <div style={{ flex:1, height:1, background:`linear-gradient(90deg, ${C.green}33, transparent)` }} />
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+              {ROADMAP.filter(r => r.tag === "THE COMMONS").map(r => (
+                <RoadmapCard key={r.title} {...r} />
+              ))}
+            </div>
+          </div>
+
+          {/* POWER TOOLS */}
+          <div style={{ marginBottom:48 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ fontSize:9, color:C.orange, fontFamily:"monospace", letterSpacing:3 }}>
+                ◈ CREATE
+              </div>
+              <div style={{ flex:1, height:1, background:`linear-gradient(90deg, ${C.orange}33, transparent)` }} />
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+              {ROADMAP.filter(r => r.tag === "POWER TOOLS").map(r => (
+                <RoadmapCard key={r.title} {...r} />
+              ))}
+            </div>
+          </div>
+
+          {/* PLATFORM */}
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ fontSize:9, color:C.blue, fontFamily:"monospace", letterSpacing:3 }}>
+                ◈ EXPAND
+              </div>
+              <div style={{ flex:1, height:1, background:`linear-gradient(90deg, ${C.blue}33, transparent)` }} />
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+              {ROADMAP.filter(r => r.tag === "PLATFORM").map(r => (
+                <RoadmapCard key={r.title} {...r} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PHILOSOPHY ──────────────────────────────────────────────────────── */}
+      <section style={{ padding:"100px 24px", maxWidth:760, margin:"0 auto", textAlign:"center" }}>
+        <Divider color={C.purple} />
+        <div style={{ marginTop:60 }}>
+          <div style={{ fontSize:11, color:C.textDim, fontFamily:"monospace",
+            letterSpacing:4, marginBottom:32 }}>FROM THE HEADMASTER'S DESK</div>
+
+          <blockquote style={{ margin:0, padding:0 }}>
+            <p style={{ fontSize:"clamp(18px,2.5vw,26px)", color:C.text,
+              fontStyle:"italic", lineHeight:1.8, marginBottom:24,
+              letterSpacing:"-0.3px" }}>
+              "A prompt is not a request. It is a spell — with a caster, a context,
+              an incantation, a constraint, and a permission to surprise you.
+              Most people write the incantation and forget the rest.
+              Wizards know: the power is in all five."
+            </p>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14 }}>
+              <div style={{ width:48, height:1, background:`linear-gradient(90deg, transparent, ${C.purple}44)` }} />
+              <span style={{ fontSize:12, color:C.textMid, fontFamily:"monospace", letterSpacing:2 }}>
+                MERLIN · HEADMASTER
+              </span>
+              <div style={{ width:48, height:1, background:`linear-gradient(90deg, ${C.purple}44, transparent)` }} />
+            </div>
+          </blockquote>
+        </div>
+      </section>
+
+      {/* ── RANK PREVIEW ────────────────────────────────────────────────────── */}
+      <section style={{
+        padding:"80px 24px",
+        background:C.surface,
+        borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}`,
+      }}>
+        <div style={{ maxWidth:900, margin:"0 auto", textAlign:"center" }}>
+          <div style={{ fontSize:9, color:C.gold, fontFamily:"monospace",
+            letterSpacing:4, marginBottom:16 }}>THE JOURNEY</div>
+          <h2 style={{ fontSize:"clamp(22px,3vw,38px)", color:C.text,
+            fontStyle:"italic", margin:"0 0 48px", letterSpacing:"-1px" }}>
+            Fifty levels. One destination.
+          </h2>
+          <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:10 }}>
+            {[
+              { rank:"Apprentice",    color:"#9ca3af", levels:"1–4" },
+              { rank:"Initiate",      color:"#6ee7b7", levels:"5–8" },
+              { rank:"Scribe",        color:"#60a5fa", levels:"9–12" },
+              { rank:"Conjurer",      color:"#a78bfa", levels:"13–17" },
+              { rank:"Mage",          color:"#f472b6", levels:"18–22" },
+              { rank:"Archmage",      color:"#fb923c", levels:"23–27" },
+              { rank:"Grand Archmage",color:"#fbbf24", levels:"28–33" },
+              { rank:"Spellbinder",   color:"#f87171", levels:"34–38" },
+              { rank:"Enchanter",     color:"#e879f9", levels:"39–43" },
+              { rank:"Arcane Master", color:"#c084fc", levels:"44–49" },
+              { rank:"Merlin",        color:"#fde68a", levels:"50" },
+            ].map(({ rank, color, levels }) => (
+              <div key={rank} style={{
+                padding:"8px 18px", borderRadius:20,
+                background:`${color}0e`, border:`1px solid ${color}33`,
+                display:"flex", alignItems:"center", gap:8,
+              }}>
+                <span style={{ width:7, height:7, borderRadius:"50%",
+                  background:color, display:"inline-block",
+                  boxShadow:`0 0 6px ${color}` }}/>
+                <span style={{ fontSize:11, color, fontFamily:"monospace", letterSpacing:1 }}>{rank}</span>
+                <span style={{ fontSize:9, color:`${color}88`, fontFamily:"monospace" }}>{levels}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ───────────────────────────────────────────────────────── */}
+      <section style={{
+        padding:"120px 24px", textAlign:"center",
+        position:"relative", overflow:"hidden",
+      }}>
+        <RuneField count={20} opacity={0.05} />
+        <div style={{ position:"relative", zIndex:2 }}>
+          <div style={{ fontSize:68, marginBottom:24,
+            filter:"drop-shadow(0 0 40px rgba(167,139,250,0.5))",
+            animation:"orbFloat 8s ease-in-out infinite" }}>⚗️</div>
+          <h2 style={{
+            fontSize:"clamp(28px,4.5vw,58px)", color:C.text,
+            fontStyle:"italic", margin:"0 0 12px",
+            letterSpacing:"-1.5px",
+            textShadow:"0 0 60px rgba(167,139,250,0.25)",
+          }}>
+            Your first spell awaits.
+          </h2>
+          <p style={{ fontSize:15, color:C.textMid, maxWidth:500,
+            margin:"16px auto 44px", lineHeight:1.8, fontStyle:"italic" }}>
+            The school is open. The library is stocked.
+            Every wizard who has ever reached Merlin started exactly here.
+          </p>
+          <button className="land-btn-primary"
+            style={{ fontSize:14, padding:"18px 52px" }}
+            onClick={onEnter}>
+            ENTER THE PLAYGROUND ✦
+          </button>
+          <div style={{ marginTop:28, fontSize:12, color:C.textDim,
+            fontFamily:"monospace", letterSpacing:2, fontStyle:"italic" }}>
+            One incantation at a time.
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop:`1px solid ${C.border}`, padding:"28px 24px",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        flexWrap:"wrap", gap:12,
+        maxWidth:"100%",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:18 }}>⚗️</span>
+          <span style={{ fontSize:13, color:C.textMid, fontStyle:"italic",
+            fontFamily:"Georgia,serif" }}>Wizards Playground</span>
+          <span style={{ fontSize:9, color:C.textDim, fontFamily:"monospace",
+            letterSpacing:2 }}>· BETA</span>
+        </div>
+        <div style={{ fontSize:10, color:C.textDim, fontFamily:"monospace",
+          letterSpacing:2 }}>
+          MERLIN'S SCHOOL OF WIZARDRY · PROMPT STUDIO
+        </div>
+        <button onClick={onEnter}
+          style={{ background:"none", border:"none", color:C.textMid,
+            fontSize:11, cursor:"pointer", fontFamily:"monospace",
+            letterSpacing:2, padding:0 }}>
+          ENTER ✦
+        </button>
+      </footer>
+    </div>
+  );
+}
+
+
 // ─── RUNES ────────────────────────────────────────────────────────────────────
 const RUNES = ["ᚠ","ᚢ","ᚦ","ᚨ","ᚱ","ᚲ","ᚷ","ᚹ","ᚺ","ᚾ","ᛁ","ᛃ","ᛇ","ᛈ","ᛉ","ᛊ","ᛏ","ᛒ","ᛖ","ᛗ","ᛚ","ᛜ","ᛞ","ᛟ","ᚦ","ᚣ","ᛣ","ᛤ","✦","◈","⊕","◎","◇","◻","❋"];
 
@@ -1821,6 +2503,7 @@ function IntroScreen({ onDone }) {
 export default function PromptStudio() {
   // ── AUTH GATE ───────────────────────────────────────────────────────────────
   const [userEmail,   setUserEmail]   = useState(() => getActiveEmail());
+  const [showLanding, setShowLanding] = useState(() => !getActiveEmail()); // skip landing if already logged in
   const [showTutorial,setShowTutorial]= useState(false);
   const [showBeta,    setShowBeta]    = useState(false);
 
@@ -1833,6 +2516,7 @@ export default function PromptStudio() {
   const handleLogout = () => {
     clearActiveEmail();
     setUserEmail(null);
+    setShowLanding(true);
     setIntro(true);
   };
 
@@ -2003,7 +2687,8 @@ export default function PromptStudio() {
     setMySpells(updated); saveSpells(updated);
   };
 
-  // ── Auth gate ──────────────────────────────────────────────────────────────
+  // ── Landing + Auth gate ────────────────────────────────────────────────────
+  if (showLanding) return <LandingPage onEnter={() => setShowLanding(false)} />;
   if (!userEmail) return <AuthScreen onLogin={handleLogin} />;
 
   return (
