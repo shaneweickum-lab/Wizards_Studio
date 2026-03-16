@@ -183,10 +183,113 @@ function scorePrompt(vals, assembledText, imageMode = false) {
   return { scores, composite, verdict, verdictColor, verdictBg, verdictBorder, verdictIcon, advice };
 }
 
-// ─── LOCAL STORAGE ────────────────────────────────────────────────────────────
-const LS_KEY = "ps_myspells_v1";
-function loadSpells() { try { return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); } catch { return []; } }
-function saveSpells(arr) { try { localStorage.setItem(LS_KEY, JSON.stringify(arr)); } catch {} }
+// ─── ACCOUNT STORAGE ─────────────────────────────────────────────────────────
+// All data is namespaced by email so multiple accounts can coexist in localStorage
+const ACCOUNTS_KEY = "wp_accounts_v1";
+const ACTIVE_KEY   = "wp_active_v1";
+
+function getAccounts()      { try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)||"{}"); } catch { return {}; } }
+function saveAccounts(a)    { try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(a)); } catch {} }
+function getActiveEmail()   { try { return localStorage.getItem(ACTIVE_KEY)||null; } catch { return null; } }
+function setActiveEmail(e)  { try { localStorage.setItem(ACTIVE_KEY, e); } catch {} }
+function clearActiveEmail() { try { localStorage.removeItem(ACTIVE_KEY); } catch {} }
+
+function accountKey(email, key) { return `wp_${email}_${key}`; }
+function loadAccountData(email, key, fallback) {
+  try { const v = localStorage.getItem(accountKey(email,key)); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function saveAccountData(email, key, val) {
+  try { localStorage.setItem(accountKey(email,key), JSON.stringify(val)); } catch {}
+}
+
+// Per-account helpers
+const LS_KEY = "myspells";
+function loadSpells(email)    { return loadAccountData(email, LS_KEY, []); }
+function saveSpells(email, a) { saveAccountData(email, LS_KEY, a); }
+function loadXPForUser(email) { return loadAccountData(email, "xp", 0); }
+function saveXPForUser(email, n) { saveAccountData(email, "xp", n); }
+function loadProfile(email)   { return loadAccountData(email, "profile", null); }
+function saveProfile(email,p) { saveAccountData(email, "profile", p); }
+function isTutorialDone(email){ return loadAccountData(email, "tutorial_done", false); }
+function setTutorialDone(email){ saveAccountData(email, "tutorial_done", true); }
+function hashPw(pw) { return btoa(pw + "_wp_salt_v1"); }
+
+// ─── RANKS + XP ───────────────────────────────────────────────────────────────
+const RANKS = [
+  { level:1,  rank:"Apprentice",    xpNeeded:0,      color:"#9ca3af", glow:"#9ca3af33" },
+  { level:2,  rank:"Apprentice",    xpNeeded:50,     color:"#9ca3af", glow:"#9ca3af33" },
+  { level:3,  rank:"Apprentice",    xpNeeded:130,    color:"#9ca3af", glow:"#9ca3af33" },
+  { level:4,  rank:"Apprentice",    xpNeeded:250,    color:"#9ca3af", glow:"#9ca3af33" },
+  { level:5,  rank:"Initiate",      xpNeeded:420,    color:"#6ee7b7", glow:"#6ee7b733" },
+  { level:6,  rank:"Initiate",      xpNeeded:650,    color:"#6ee7b7", glow:"#6ee7b733" },
+  { level:7,  rank:"Initiate",      xpNeeded:950,    color:"#6ee7b7", glow:"#6ee7b733" },
+  { level:8,  rank:"Initiate",      xpNeeded:1320,   color:"#6ee7b7", glow:"#6ee7b733" },
+  { level:9,  rank:"Scribe",        xpNeeded:1800,   color:"#60a5fa", glow:"#60a5fa33" },
+  { level:10, rank:"Scribe",        xpNeeded:2400,   color:"#60a5fa", glow:"#60a5fa33" },
+  { level:11, rank:"Scribe",        xpNeeded:3100,   color:"#60a5fa", glow:"#60a5fa33" },
+  { level:12, rank:"Scribe",        xpNeeded:3900,   color:"#60a5fa", glow:"#60a5fa33" },
+  { level:13, rank:"Conjurer",      xpNeeded:4900,   color:"#a78bfa", glow:"#a78bfa33" },
+  { level:14, rank:"Conjurer",      xpNeeded:6100,   color:"#a78bfa", glow:"#a78bfa33" },
+  { level:15, rank:"Conjurer",      xpNeeded:7500,   color:"#a78bfa", glow:"#a78bfa33" },
+  { level:16, rank:"Conjurer",      xpNeeded:9200,   color:"#a78bfa", glow:"#a78bfa33" },
+  { level:17, rank:"Conjurer",      xpNeeded:11200,  color:"#a78bfa", glow:"#a78bfa33" },
+  { level:18, rank:"Mage",          xpNeeded:13500,  color:"#f472b6", glow:"#f472b633" },
+  { level:19, rank:"Mage",          xpNeeded:16200,  color:"#f472b6", glow:"#f472b633" },
+  { level:20, rank:"Mage",          xpNeeded:19200,  color:"#f472b6", glow:"#f472b633" },
+  { level:21, rank:"Mage",          xpNeeded:22700,  color:"#f472b6", glow:"#f472b633" },
+  { level:22, rank:"Mage",          xpNeeded:26700,  color:"#f472b6", glow:"#f472b633" },
+  { level:23, rank:"Archmage",      xpNeeded:31200,  color:"#fb923c", glow:"#fb923c33" },
+  { level:24, rank:"Archmage",      xpNeeded:36400,  color:"#fb923c", glow:"#fb923c33" },
+  { level:25, rank:"Archmage",      xpNeeded:42400,  color:"#fb923c", glow:"#fb923c33" },
+  { level:26, rank:"Archmage",      xpNeeded:49200,  color:"#fb923c", glow:"#fb923c33" },
+  { level:27, rank:"Archmage",      xpNeeded:56900,  color:"#fb923c", glow:"#fb923c33" },
+  { level:28, rank:"Grand Archmage",xpNeeded:65700,  color:"#fbbf24", glow:"#fbbf2433" },
+  { level:29, rank:"Grand Archmage",xpNeeded:75700,  color:"#fbbf24", glow:"#fbbf2433" },
+  { level:30, rank:"Grand Archmage",xpNeeded:87000,  color:"#fbbf24", glow:"#fbbf2433" },
+  { level:31, rank:"Grand Archmage",xpNeeded:99700,  color:"#fbbf24", glow:"#fbbf2433" },
+  { level:32, rank:"Grand Archmage",xpNeeded:114000, color:"#fbbf24", glow:"#fbbf2433" },
+  { level:33, rank:"Grand Archmage",xpNeeded:130000, color:"#fbbf24", glow:"#fbbf2433" },
+  { level:34, rank:"Spellbinder",   xpNeeded:148000, color:"#f87171", glow:"#f8717133" },
+  { level:35, rank:"Spellbinder",   xpNeeded:168000, color:"#f87171", glow:"#f8717133" },
+  { level:36, rank:"Spellbinder",   xpNeeded:190000, color:"#f87171", glow:"#f8717133" },
+  { level:37, rank:"Spellbinder",   xpNeeded:215000, color:"#f87171", glow:"#f8717133" },
+  { level:38, rank:"Spellbinder",   xpNeeded:243000, color:"#f87171", glow:"#f8717133" },
+  { level:39, rank:"Enchanter",     xpNeeded:274000, color:"#e879f9", glow:"#e879f933" },
+  { level:40, rank:"Enchanter",     xpNeeded:308000, color:"#e879f9", glow:"#e879f933" },
+  { level:41, rank:"Enchanter",     xpNeeded:346000, color:"#e879f9", glow:"#e879f933" },
+  { level:42, rank:"Enchanter",     xpNeeded:388000, color:"#e879f9", glow:"#e879f933" },
+  { level:43, rank:"Enchanter",     xpNeeded:434000, color:"#e879f9", glow:"#e879f933" },
+  { level:44, rank:"Arcane Master", xpNeeded:485000, color:"#c084fc", glow:"#c084fc33" },
+  { level:45, rank:"Arcane Master", xpNeeded:542000, color:"#c084fc", glow:"#c084fc33" },
+  { level:46, rank:"Arcane Master", xpNeeded:605000, color:"#c084fc", glow:"#c084fc33" },
+  { level:47, rank:"Arcane Master", xpNeeded:675000, color:"#c084fc", glow:"#c084fc33" },
+  { level:48, rank:"Arcane Master", xpNeeded:752000, color:"#c084fc", glow:"#c084fc33" },
+  { level:49, rank:"Arcane Master", xpNeeded:836000, color:"#c084fc", glow:"#c084fc33" },
+  { level:50, rank:"Merlin",        xpNeeded:928000, color:"#fde68a", glow:"#fde68a55" },
+];
+
+const XP_REWARDS = {
+  fillSection: 10,
+  completeAllSections: 25,
+  castSpell: 50,
+  saveToCodex: 30,
+};
+
+function getRankInfo(xp) {
+  let current = RANKS[0];
+  for (let i = RANKS.length - 1; i >= 0; i--) {
+    if (xp >= RANKS[i].xpNeeded) { current = RANKS[i]; break; }
+  }
+  const next     = RANKS.find(r => r.xpNeeded > xp) || null;
+  const prevXp   = current.xpNeeded;
+  const nextXp   = next ? next.xpNeeded : current.xpNeeded;
+  const progress = next ? Math.min(1, (xp - prevXp) / (nextXp - prevXp)) : 1;
+  return { current, next, progress, xpToNext: next ? nextXp - xp : 0 };
+}
+
+// XP helpers now per-account — see loadXPForUser / saveXPForUser above
+
 
 // ─── GHOST BUTTON STYLE ───────────────────────────────────────────────────────
 const ghostBtn = (extra={}) => ({
@@ -632,6 +735,827 @@ function SaveModal({ saveForm, setSaveForm, handleSave, onClose }) {
   );
 }
 
+
+// ─── XP BAR (nav widget) ──────────────────────────────────────────────────────
+function XPBar({ xp, isMobile }) {
+  const { current, next, progress, xpToNext } = getRankInfo(xp);
+  const isMerlin = current.level === 50;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8,
+      padding:"4px 10px", background:C.surface2,
+      border:`1px solid ${current.color}44`, borderRadius:20,
+      boxShadow:`0 0 8px ${current.glow}` }}>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
+        <span style={{ fontSize:9, color:current.color, fontFamily:"monospace",
+          letterSpacing:1, fontWeight:"bold", whiteSpace:"nowrap" }}>
+          {isMerlin ? "✦ MERLIN" : current.rank.toUpperCase()}
+        </span>
+        <span style={{ fontSize:8, color:C.textDim, fontFamily:"monospace" }}>
+          LVL {current.level}
+        </span>
+      </div>
+      {!isMobile && (
+        <div style={{ width:72, display:"flex", flexDirection:"column", gap:3 }}>
+          <div style={{ height:3, background:C.border, borderRadius:2, overflow:"hidden" }}>
+            <div style={{ width:`${progress*100}%`, height:"100%",
+              background:`linear-gradient(90deg,${current.color}88,${current.color})`,
+              borderRadius:2, transition:"width 0.6s ease" }}/>
+          </div>
+          <span style={{ fontSize:8, color:C.textDim, fontFamily:"monospace", textAlign:"right" }}>
+            {isMerlin ? "MAX" : `${xpToNext} XP`}
+          </span>
+        </div>
+      )}
+      <span style={{ fontSize:9, color:current.color, fontFamily:"monospace",
+        fontWeight:"bold", minWidth:28, textAlign:"right" }}>
+        {xp >= 1000 ? `${(xp/1000).toFixed(1)}k` : xp}
+      </span>
+    </div>
+  );
+}
+
+// ─── LEVEL UP TOAST ───────────────────────────────────────────────────────────
+function LevelUpToast({ rankInfo, onDone }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setVisible(true), 80);
+    const t2 = setTimeout(() => { setVisible(false); setTimeout(onDone, 400); }, 3600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+  return (
+    <div style={{ position:"fixed", bottom:28, left:"50%",
+      zIndex:200, pointerEvents:"none",
+      opacity: visible ? 1 : 0,
+      transform: `translateX(-50%) translateY(${visible ? 0 : 16}px)`,
+      transition:"opacity 0.35s, transform 0.35s" }}>
+      <div style={{ background:C.surface, border:`2px solid ${rankInfo.current.color}`,
+        borderRadius:16, padding:"16px 32px", textAlign:"center", position:"relative",
+        boxShadow:`0 0 40px ${rankInfo.current.glow}, 0 8px 30px rgba(0,0,0,0.7)` }}>
+        <div style={{ fontSize:10, color:rankInfo.current.color, fontFamily:"monospace",
+          letterSpacing:4, marginBottom:6 }}>LEVEL UP ✦</div>
+        <div style={{ fontSize:26, color:C.text, fontStyle:"italic", marginBottom:4 }}>
+          Level {rankInfo.current.level}
+        </div>
+        <div style={{ fontSize:12, color:rankInfo.current.color, fontFamily:"monospace",
+          letterSpacing:2, marginBottom:6 }}>
+          {rankInfo.current.rank.toUpperCase()}
+        </div>
+        <div style={{ fontSize:11, color:C.textMid, fontFamily:"monospace" }}>
+          {rankInfo.next
+            ? `${rankInfo.xpToNext.toLocaleString()} XP to Level ${rankInfo.current.level + 1}`
+            : "Maximum rank achieved. ✦"}
+        </div>
+        <div style={{ position:"absolute", inset:-1, borderRadius:16, pointerEvents:"none",
+          boxShadow:`inset 0 0 24px ${rankInfo.current.glow}` }}/>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
+function AuthScreen({ onLogin }) {
+  const [mode,     setMode]     = useState("login"); // login | signup
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
+  const [name,     setName]     = useState("");
+  const [error,    setError]    = useState("");
+  const [success,  setSuccess]  = useState("");
+  const [loading,  setLoading]  = useState(false);
+
+  const floatRunes = useState(() =>
+    Array.from({ length: 18 }, () => ({
+      glyph: RUNES[Math.floor(Math.random() * RUNES.length)],
+      x: Math.random() * 100, y: Math.random() * 100,
+      size: 13 + Math.random() * 18,
+      color: ["#a78bfa22","#f472b622","#34d39922","#60a5fa22","#fb923c22"][Math.floor(Math.random()*5)],
+      dur: 8 + Math.random() * 12, delay: Math.random() * 8,
+    }))
+  )[0];
+
+  const clear  = () => { setError(""); setSuccess(""); };
+  const go     = m => { setMode(m); clear(); };
+
+  const inputStyle = {
+    width:"100%", background:"#0d0d14", border:"1px solid #2a2a3a",
+    borderRadius:10, padding:"13px 16px", color:"#e8e4d9", fontSize:14,
+    fontFamily:"Georgia,serif", outline:"none", boxSizing:"border-box",
+    transition:"border-color 0.2s",
+  };
+
+  const handleSubmit = () => {
+    if (!email.trim() || !email.includes("@")) { setError("Enter a valid email."); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (mode === "signup" && !name.trim()) { setError("Enter your name."); return; }
+    clear(); setLoading(true);
+
+    setTimeout(() => {
+      const accounts = getAccounts();
+      const key = email.toLowerCase().trim();
+      if (mode === "signup") {
+        if (accounts[key]) { setError("An account with this email already exists."); setLoading(false); return; }
+        accounts[key] = { email:key, password:hashPw(password), createdAt:Date.now() };
+        saveAccounts(accounts);
+        // Save initial profile
+        saveProfile(key, { name:name.trim(), avatar:"🧙", handle:"", createdAt:Date.now() });
+        setActiveEmail(key);
+        setSuccess("Account created. Entering the Playground…");
+        setTimeout(() => onLogin(key, true), 900); // true = new account → show tutorial
+      } else {
+        if (!accounts[key]) { setError("No account found with this email."); setLoading(false); return; }
+        if (accounts[key].password !== hashPw(password)) { setError("Incorrect password."); setLoading(false); return; }
+        setActiveEmail(key);
+        setSuccess("Welcome back. Entering the Playground…");
+        setTimeout(() => onLogin(key, false), 800);
+      }
+    }, 600);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#08080e", display:"flex", alignItems:"center",
+      justifyContent:"center", position:"relative", overflow:"hidden" }}>
+      <style>{`
+        @keyframes floatRune { 0%,100%{transform:translateY(0) rotate(0deg);opacity:0.5} 50%{transform:translateY(-18px) rotate(8deg);opacity:1} }
+        @keyframes authFadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .wp-input:focus { border-color:#a78bfa !important; }
+      `}</style>
+
+      {/* Floating runes */}
+      {floatRunes.map((r,i) => (
+        <div key={i} style={{ position:"absolute", left:`${r.x}%`, top:`${r.y}%`,
+          fontSize:r.size, color:r.color, userSelect:"none", pointerEvents:"none",
+          animation:`floatRune ${r.dur}s ${r.delay}s ease-in-out infinite` }}>{r.glyph}</div>
+      ))}
+
+      <div style={{ width:"100%", maxWidth:420, padding:"0 24px",
+        animation:"authFadeIn 0.5s ease", position:"relative", zIndex:10 }}>
+
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:36 }}>
+          <div style={{ fontSize:38, marginBottom:8, textShadow:"0 0 30px rgba(167,139,250,0.5)" }}>⚗️</div>
+          <div style={{ fontSize:24, color:"#e8e4d9", letterSpacing:"-0.5px",
+            fontStyle:"italic", fontFamily:"Georgia,serif", marginBottom:6 }}>Wizards Playground</div>
+          <div style={{ fontSize:9, color:"#3a3a5a", letterSpacing:4, fontFamily:"monospace" }}>
+            WORDS ARE SPELLS. YOUR PROMPTS SHOULD BE TOO.
+          </div>
+        </div>
+
+        {/* Card */}
+        <div style={{ background:"#0d0d14", border:"1px solid #2a2a3a",
+          borderRadius:18, padding:"28px 26px", boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
+
+          {/* Tab switcher */}
+          <div style={{ display:"flex", background:"#08080e", borderRadius:10,
+            padding:4, marginBottom:24, gap:4 }}>
+            {["login","signup"].map(m => (
+              <button key={m} onClick={() => go(m)}
+                style={{ flex:1, padding:"9px", borderRadius:8,
+                  background: mode===m ? "#1a1a2e" : "transparent",
+                  border: mode===m ? "1px solid #2a2a3a" : "1px solid transparent",
+                  color: mode===m ? "#e8e4d9" : "#4a4a6a",
+                  fontSize:10, cursor:"pointer", letterSpacing:2, fontFamily:"monospace",
+                  transition:"all 0.2s" }}>
+                {m === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
+              </button>
+            ))}
+          </div>
+
+          {/* Fields */}
+          {mode === "signup" && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:10, color:"#5a5a7a", letterSpacing:2,
+                fontFamily:"monospace", marginBottom:6 }}>YOUR NAME</div>
+              <input className="wp-input" value={name}
+                onChange={e => { setName(e.target.value); clear(); }}
+                placeholder="How shall we call you?"
+                style={inputStyle} />
+            </div>
+          )}
+
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:10, color:"#5a5a7a", letterSpacing:2,
+              fontFamily:"monospace", marginBottom:6 }}>EMAIL</div>
+            <input className="wp-input" type="email" value={email}
+              onChange={e => { setEmail(e.target.value); clear(); }}
+              onKeyDown={e => e.key==="Enter" && handleSubmit()}
+              placeholder="your@email.com" style={inputStyle} />
+          </div>
+
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:10, color:"#5a5a7a", letterSpacing:2,
+              fontFamily:"monospace", marginBottom:6 }}>PASSWORD</div>
+            <div style={{ position:"relative" }}>
+              <input className="wp-input" type={showPw?"text":"password"} value={password}
+                onChange={e => { setPassword(e.target.value); clear(); }}
+                onKeyDown={e => e.key==="Enter" && handleSubmit()}
+                placeholder="Min. 6 characters" style={inputStyle} />
+              <button onClick={() => setShowPw(v=>!v)}
+                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                  background:"none", border:"none", color:"#5a5a7a", cursor:"pointer",
+                  fontSize:11, fontFamily:"monospace", letterSpacing:1 }}>
+                {showPw?"HIDE":"SHOW"}
+              </button>
+            </div>
+          </div>
+
+          {/* Error / success */}
+          {error && (
+            <div style={{ background:"#1a0f0f", border:"1px solid #3a1a1a", borderRadius:8,
+              padding:"10px 14px", marginBottom:16, fontSize:12, color:"#f87171", fontFamily:"monospace" }}>
+              ✕ {error}
+            </div>
+          )}
+          {success && (
+            <div style={{ background:"#0f1a14", border:"1px solid #1a3a24", borderRadius:8,
+              padding:"10px 14px", marginBottom:16, fontSize:12, color:"#4ade80", fontFamily:"monospace" }}>
+              ✓ {success}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button onClick={handleSubmit} disabled={loading}
+            style={{ width:"100%", background:"linear-gradient(135deg,#7b6cf6,#c084fc)",
+              border:"none", borderRadius:10, padding:"14px", color:"#fff", fontSize:12,
+              cursor:loading?"not-allowed":"pointer", letterSpacing:2, fontFamily:"monospace",
+              opacity:loading?0.7:1, display:"flex", alignItems:"center",
+              justifyContent:"center", gap:8, transition:"opacity 0.2s" }}>
+            {loading
+              ? <span style={{ width:14, height:14, border:"2px solid #ffffff44",
+                  borderTopColor:"#fff", borderRadius:"50%",
+                  animation:"spin 0.7s linear infinite", display:"inline-block" }}/>
+              : mode==="login" ? "ENTER THE PLAYGROUND ✦" : "CREATE ACCOUNT ✦"
+            }
+          </button>
+        </div>
+
+        {/* Beta notice */}
+        <div style={{ marginTop:20, textAlign:"center", padding:"12px 16px",
+          background:"#0d0d14", border:"1px solid #fbbf2422", borderRadius:12 }}>
+          <div style={{ fontSize:9, color:"#fbbf24", fontFamily:"monospace",
+            letterSpacing:3, marginBottom:4 }}>⚗️ BETA</div>
+          <div style={{ fontSize:11, color:"#5a5a7a", lineHeight:1.6 }}>
+            Wizards Playground is in active development. Your data is stored locally for now.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── HANDLE AVAILABILITY ──────────────────────────────────────────────────────
+function checkHandleAvailable(handle, currentEmail) {
+  if (!handle.trim()) return null; // empty = no check needed
+  const h = handle.toLowerCase().trim();
+  const accounts = getAccounts();
+  for (const email of Object.keys(accounts)) {
+    if (email === currentEmail) continue; // skip own account
+    const p = loadProfile(email);
+    if (p?.handle && p.handle.toLowerCase() === h) return false; // taken
+  }
+  return true; // available
+}
+
+// ─── SETTINGS PANEL ───────────────────────────────────────────────────────────
+const AVATARS = ["🧙","🔮","⚗️","✦","🌙","⚡","🦉","🐉","🌟","🗝️","📜","🔥","💎","🌀","🪄"];
+
+function SettingsPanel({ userEmail, xp, profile, onSaveProfile, onLogout, onClose }) {
+  const { current, next, progress, xpToNext } = getRankInfo(xp);
+  const isMerlin = current.level === 50;
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [editName,        setEditName]        = useState(profile?.name   || "");
+  const [editHandle,      setEditHandle]      = useState(profile?.handle || "");
+  const [editAvatar,      setEditAvatar]      = useState(profile?.avatar || "🧙");
+  const [saved,           setSaved]           = useState(false);
+  const [handleStatus,    setHandleStatus]    = useState(null); // null | "checking" | "available" | "taken" | "own"
+  const debounceRef = useRef(null);
+
+  // Run availability check whenever editHandle changes
+  useEffect(() => {
+    const h = editHandle.trim();
+    if (!h) { setHandleStatus(null); return; }
+    // If it's unchanged from the saved profile handle, mark as own
+    if (h.toLowerCase() === (profile?.handle || "").toLowerCase()) {
+      setHandleStatus("own"); return;
+    }
+    setHandleStatus("checking");
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const result = checkHandleAvailable(h, userEmail);
+      setHandleStatus(result ? "available" : "taken");
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
+  }, [editHandle]);
+
+  const handleSave = () => {
+    if (handleStatus === "taken") return;
+    const updated = { ...profile, name:editName.trim(), handle:editHandle.trim(), avatar:editAvatar };
+    onSaveProfile(updated);
+    setSaved(true);
+    setHandleStatus(editHandle.trim() ? "own" : null);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const canSave = handleStatus !== "taken";
+
+  const fieldStyle = {
+    width:"100%", background:C.surface, border:`1px solid ${C.border2}`,
+    borderRadius:8, padding:"10px 12px", color:C.text, fontSize:13,
+    fontFamily:"Georgia,serif", outline:"none", boxSizing:"border-box",
+    transition:"border-color 0.2s",
+  };
+
+  return (
+    <div onClick={onClose}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)",
+        backdropFilter:"blur(4px)", zIndex:200, display:"flex",
+        alignItems:"flex-start", justifyContent:"flex-end" }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width:360, height:"100%", background:C.surface,
+          borderLeft:`1px solid ${C.border}`, display:"flex",
+          flexDirection:"column", overflowY:"auto",
+          boxShadow:"-20px 0 60px rgba(0,0,0,0.5)" }}>
+
+        {/* Header */}
+        <div style={{ padding:"20px 20px 16px", borderBottom:`1px solid ${C.border}`,
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+          <div>
+            <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:3, marginBottom:4 }}>⚙ SETTINGS</div>
+            <div style={{ fontSize:18, color:C.text, fontStyle:"italic" }}>Wizard's Chamber</div>
+          </div>
+          <button onClick={onClose}
+            style={{ background:"none", border:"none", color:C.textMid,
+              fontSize:18, cursor:"pointer", padding:4, lineHeight:1 }}>✕</button>
+        </div>
+
+        {/* Profile card */}
+        <div style={{ padding:"20px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:3, marginBottom:14 }}>PROFILE</div>
+
+          {/* Avatar row */}
+          <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
+            <div style={{ width:60, height:60, borderRadius:16,
+              background:C.surface2, border:`2px solid ${current.color}44`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:30, flexShrink:0, boxShadow:`0 0 16px ${current.glow}` }}>
+              {editAvatar}
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:16, color:C.text, fontStyle:"italic", fontFamily:"Georgia,serif" }}>
+                {editName || "Unnamed Wizard"}
+              </div>
+              {editHandle && (
+                <div style={{ fontSize:11, color:C.textMid, fontFamily:"monospace", marginTop:2 }}>@{editHandle}</div>
+              )}
+              <div style={{ fontSize:10, color:current.color, fontFamily:"monospace", marginTop:4, letterSpacing:1 }}>
+                {isMerlin ? "✦ MERLIN" : current.rank} · Lv {current.level}
+              </div>
+            </div>
+          </div>
+
+          {/* Avatar picker */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:9, color:C.textMid, fontFamily:"monospace", letterSpacing:2, marginBottom:8 }}>CHOOSE AVATAR</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+              {AVATARS.map(a => (
+                <button key={a} onClick={() => setEditAvatar(a)}
+                  style={{ width:36, height:36, borderRadius:8, fontSize:18,
+                    background: editAvatar===a ? `${current.color}22` : C.surface2,
+                    border:`1px solid ${editAvatar===a ? current.color+"66" : C.border2}`,
+                    cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                    transition:"all 0.15s" }}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Name */}
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:9, color:C.textMid, fontFamily:"monospace", letterSpacing:2, marginBottom:6 }}>DISPLAY NAME</div>
+            <input value={editName} onChange={e => setEditName(e.target.value)}
+              placeholder="Your wizard name…"
+              style={fieldStyle}
+              onFocus={e => e.target.style.borderColor=current.color}
+              onBlur={e => e.target.style.borderColor=C.border2} />
+          </div>
+
+          {/* Handle */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <div style={{ fontSize:9, color:C.textMid, fontFamily:"monospace", letterSpacing:2 }}>HANDLE (OPTIONAL)</div>
+              {handleStatus === "checking" && (
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ width:7, height:7, borderRadius:"50%", border:`1.5px solid ${C.textDim}`,
+                    borderTopColor:C.purple, display:"inline-block",
+                    animation:"spin 0.7s linear infinite" }}/>
+                  <span style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:1 }}>CHECKING…</span>
+                </div>
+              )}
+              {handleStatus === "available" && (
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ width:7, height:7, borderRadius:"50%", background:C.green, display:"inline-block" }}/>
+                  <span style={{ fontSize:9, color:C.green, fontFamily:"monospace", letterSpacing:1 }}>AVAILABLE</span>
+                </div>
+              )}
+              {handleStatus === "taken" && (
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ width:7, height:7, borderRadius:"50%", background:"#f87171", display:"inline-block" }}/>
+                  <span style={{ fontSize:9, color:"#f87171", fontFamily:"monospace", letterSpacing:1 }}>TAKEN</span>
+                </div>
+              )}
+              {handleStatus === "own" && (
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ width:7, height:7, borderRadius:"50%", background:current.color, display:"inline-block" }}/>
+                  <span style={{ fontSize:9, color:current.color, fontFamily:"monospace", letterSpacing:1 }}>YOUR HANDLE</span>
+                </div>
+              )}
+            </div>
+            <div style={{ position:"relative" }}>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)",
+                fontSize:13, color:C.textMid, fontFamily:"monospace", pointerEvents:"none" }}>@</span>
+              <input value={editHandle} onChange={e => setEditHandle(e.target.value.replace(/[^a-zA-Z0-9_]/g,""))}
+                placeholder="yourhandle"
+                style={{ ...fieldStyle, paddingLeft:26,
+                  borderColor: handleStatus==="taken" ? "#f8717166"
+                    : handleStatus==="available" ? `${C.green}66`
+                    : handleStatus==="own" ? `${current.color}44`
+                    : C.border2 }}
+                onFocus={e => {
+                  if (handleStatus !== "taken" && handleStatus !== "available") e.target.style.borderColor=current.color;
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = handleStatus==="taken" ? "#f8717166"
+                    : handleStatus==="available" ? `${C.green}66`
+                    : handleStatus==="own" ? `${current.color}44`
+                    : C.border2;
+                }} />
+            </div>
+            {handleStatus === "taken" && (
+              <div style={{ fontSize:10, color:"#f87171", fontFamily:"monospace", marginTop:5, letterSpacing:0.5 }}>
+                @{editHandle} is already claimed by another wizard.
+              </div>
+            )}
+            {handleStatus === "available" && (
+              <div style={{ fontSize:10, color:C.green, fontFamily:"monospace", marginTop:5, letterSpacing:0.5 }}>
+                @{editHandle} is yours for the taking.
+              </div>
+            )}
+          </div>
+
+          {/* Save */}
+          <button onClick={canSave ? handleSave : undefined}
+            style={{ width:"100%", padding:"11px",
+              background: saved ? "#07120c" : canSave ? "linear-gradient(135deg,#7b6cf6,#c084fc)" : C.surface2,
+              border: saved ? "1px solid #1a4a28" : canSave ? "none" : `1px solid ${C.border2}`,
+              borderRadius:10,
+              color: saved ? "#4ade80" : canSave ? "#fff" : C.textDim,
+              fontSize:10, cursor: canSave ? "pointer" : "not-allowed", letterSpacing:2,
+              fontFamily:"monospace", transition:"all 0.3s", opacity: canSave ? 1 : 0.5 }}>
+            {saved ? "✓ SAVED" : handleStatus==="taken" ? "HANDLE TAKEN" : "SAVE PROFILE"}
+          </button>
+        </div>
+
+        {/* Account */}
+        <div style={{ padding:"20px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:3, marginBottom:14 }}>ACCOUNT</div>
+          <div style={{ background:C.surface2, border:`1px solid ${C.border2}`, borderRadius:12, padding:"14px 16px" }}>
+            <div style={{ fontSize:9, color:C.textMid, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>SIGNED IN AS</div>
+            <div style={{ fontSize:12, color:C.text, wordBreak:"break-all", fontFamily:"monospace" }}>{userEmail}</div>
+          </div>
+        </div>
+
+        {/* Rank & XP */}
+        <div style={{ padding:"20px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:3, marginBottom:14 }}>RANK & PROGRESS</div>
+          <div style={{ background:C.surface2, border:`1px solid ${current.color}33`, borderRadius:12,
+            padding:"18px", boxShadow:`0 0 20px ${current.glow}` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+              <div>
+                <div style={{ fontSize:20, color:current.color, fontFamily:"monospace", fontWeight:"bold", letterSpacing:1 }}>
+                  {isMerlin ? "✦ MERLIN" : current.rank.toUpperCase()}
+                </div>
+                <div style={{ fontSize:11, color:C.textMid, fontFamily:"monospace", marginTop:3 }}>Level {current.level}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:22, color:current.color, fontFamily:"monospace", fontWeight:"bold" }}>
+                  {xp >= 1000 ? `${(xp/1000).toFixed(1)}k` : xp}
+                </div>
+                <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:1 }}>TOTAL XP</div>
+              </div>
+            </div>
+            {!isMerlin && (
+              <>
+                <div style={{ height:4, background:C.border, borderRadius:2, overflow:"hidden", marginBottom:8 }}>
+                  <div style={{ width:`${progress*100}%`, height:"100%",
+                    background:`linear-gradient(90deg,${current.color}88,${current.color})`,
+                    borderRadius:2, transition:"width 0.6s ease" }}/>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace" }}>{next?.rank?.toUpperCase()} — LVL {next?.level}</div>
+                  <div style={{ fontSize:9, color:C.textMid, fontFamily:"monospace" }}>{xpToNext} XP to go</div>
+                </div>
+              </>
+            )}
+            {isMerlin && (
+              <div style={{ fontSize:11, color:current.color, fontFamily:"monospace", letterSpacing:1, textAlign:"center" }}>
+                ✦ Maximum rank achieved ✦
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Data notice */}
+        <div style={{ padding:"20px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.textDim, fontFamily:"monospace", letterSpacing:3, marginBottom:10 }}>DATA</div>
+          <div style={{ fontSize:11, color:C.textMid, lineHeight:1.7, fontFamily:"monospace" }}>
+            Spells, XP, and rank are stored locally in this browser. Signing out does not delete your data.
+          </div>
+        </div>
+
+        {/* Sign Out */}
+        <div style={{ padding:"20px", marginTop:"auto" }}>
+          {!confirmLogout ? (
+            <button onClick={() => setConfirmLogout(true)}
+              style={{ width:"100%", background:"transparent",
+                border:`1px solid ${C.border2}`, borderRadius:10,
+                padding:"12px", color:C.textMid, fontSize:11,
+                cursor:"pointer", letterSpacing:2, fontFamily:"monospace",
+                transition:"all 0.2s" }}
+              onMouseEnter={e => { e.target.style.borderColor="#f8717144"; e.target.style.color="#f87171"; }}
+              onMouseLeave={e => { e.target.style.borderColor=C.border2; e.target.style.color=C.textMid; }}>
+              ⇤ SIGN OUT
+            </button>
+          ) : (
+            <div style={{ background:"#100707", border:"1px solid #3a141422", borderRadius:12, padding:16 }}>
+              <div style={{ fontSize:12, color:"#f87171", fontFamily:"monospace", marginBottom:10, textAlign:"center", letterSpacing:1 }}>
+                Leave the Playground?
+              </div>
+              <div style={{ fontSize:11, color:C.textMid, fontFamily:"monospace", marginBottom:16, textAlign:"center", lineHeight:1.6 }}>
+                Your progress stays here.<br/>Return any time.
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setConfirmLogout(false)}
+                  style={{ flex:1, background:"transparent", border:`1px solid ${C.border2}`,
+                    borderRadius:8, padding:"10px", color:C.textMid, fontSize:10,
+                    cursor:"pointer", letterSpacing:1.5, fontFamily:"monospace" }}>
+                  STAY
+                </button>
+                <button onClick={onLogout}
+                  style={{ flex:1, background:"#2a0a0a", border:"1px solid #f8717166",
+                    borderRadius:8, padding:"10px", color:"#f87171", fontSize:10,
+                    cursor:"pointer", letterSpacing:1.5, fontFamily:"monospace" }}>
+                  SIGN OUT ⇤
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── BETA BANNER ──────────────────────────────────────────────────────────────
+function BetaBanner({ onDismiss }) {
+  const [open, setOpen] = useState(true);
+  if (!open) return null;
+
+  const DONE = [
+    "Five-layer Spell Builder (Anchor, Feeling, Voice, Constraint, Permission)",
+    "Image generation prompt detection and mode switching",
+    "Live Quality Checker — 4-dimension real-time scoring",
+    "The Codex — pre-built spell library + personal saved spells",
+    "XP + Rank system (50 levels, Apprentice → Merlin)",
+    "Animated intro sequence with rune swarm and light arc",
+  ];
+  const NEXT = [
+    "User profiles with avatar, handle, and rank display",
+    "Prompt History — log of every spell you've cast",
+    "The Grimoire — full course lessons inside the app",
+    "Community Playground — share spells, post wins",
+    "Cross-device sync via cloud storage",
+    "Mobile app (iOS + Android)",
+  ];
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)",
+      backdropFilter:"blur(4px)", zIndex:500, display:"flex",
+      alignItems:"center", justifyContent:"center", padding:"20px" }}>
+      <div style={{ background:C.surface, border:`1px solid #fbbf2433`,
+        borderRadius:20, maxWidth:560, width:"100%",
+        maxHeight:"85vh", overflowY:"auto",
+        boxShadow:"0 0 60px rgba(251,191,36,0.1), 0 20px 60px rgba(0,0,0,0.6)" }}>
+
+        {/* Header */}
+        <div style={{ padding:"28px 28px 20px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div>
+              <div style={{ fontSize:9, color:"#fbbf24", fontFamily:"monospace",
+                letterSpacing:4, marginBottom:6 }}>⚗️ BETA v0.1</div>
+              <div style={{ fontSize:22, color:C.text, fontStyle:"italic", marginBottom:6 }}>
+                Wizards Playground
+              </div>
+              <div style={{ fontSize:13, color:C.textMid, lineHeight:1.7, maxWidth:420 }}>
+                This app is in active development. Some features are still being built.
+                Here's where things stand — and where we're heading.
+              </div>
+            </div>
+            <button onClick={() => { setOpen(false); onDismiss(); }}
+              style={{ background:"none", border:"none", color:C.textMid,
+                fontSize:20, cursor:"pointer", padding:4, flexShrink:0 }}>✕</button>
+          </div>
+        </div>
+
+        {/* What's live */}
+        <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:"#4ade80", fontFamily:"monospace",
+            letterSpacing:3, marginBottom:14 }}>✓ WHAT'S LIVE NOW</div>
+          {DONE.map((item, i) => (
+            <div key={i} style={{ display:"flex", gap:10, marginBottom:10, alignItems:"flex-start" }}>
+              <span style={{ color:"#4ade80", fontSize:12, flexShrink:0, marginTop:2 }}>✓</span>
+              <span style={{ fontSize:13, color:C.textMid, lineHeight:1.6 }}>{item}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* What's coming */}
+        <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.purple, fontFamily:"monospace",
+            letterSpacing:3, marginBottom:14 }}>◈ COMING NEXT</div>
+          {NEXT.map((item, i) => (
+            <div key={i} style={{ display:"flex", gap:10, marginBottom:10, alignItems:"flex-start" }}>
+              <span style={{ color:C.purple, fontSize:12, flexShrink:0, marginTop:2 }}>◦</span>
+              <span style={{ fontSize:13, color:C.textMid, lineHeight:1.6 }}>{item}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"20px 28px", display:"flex",
+          justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+          <div style={{ fontSize:12, color:C.textDim, fontStyle:"italic", fontFamily:"Georgia,serif" }}>
+            One incantation at a time.
+          </div>
+          <button onClick={() => { setOpen(false); onDismiss(); }}
+            style={{ padding:"10px 28px", background:"linear-gradient(135deg,#7b6cf6,#c084fc)",
+              border:"none", borderRadius:10, color:"#fff", fontSize:11,
+              cursor:"pointer", letterSpacing:2, fontFamily:"monospace" }}>
+            ENTER ✦
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TUTORIAL OVERLAY ─────────────────────────────────────────────────────────
+const TUTORIAL_STEPS = [
+  { id:"welcome",  target:null,        title:"Welcome to Wizards Playground ✦",
+    body:"Words are spells — your prompts should be too. This quick tour shows you everything in about 60 seconds.",
+    placement:"center" },
+  { id:"builder",  target:"tgt-layers", title:"The Five Layers",
+    body:"Every prompt is built in five layers — Anchor, Feeling, Voice, Constraint, Permission. Each one sharpens your intention. Fill them in order or jump around.",
+    placement:"bottom" },
+  { id:"quality",  target:"tgt-quality", title:"The Quality Checker",
+    body:"As you fill each layer, your prompt is scored live across four dimensions. Hit QUALITY any time to see your score and what to strengthen.",
+    placement:"bottom" },
+  { id:"codex",    target:"tgt-codex",   title:"The Codex ◈",
+    body:"Pre-built spell templates across Language Models and Image Generation. Load any spell into the builder in one click — or save your own.",
+    placement:"bottom" },
+  { id:"xp",       target:"tgt-xp",      title:"XP + Ranks",
+    body:"You earn XP for filling layers, casting spells, and saving to the Codex. Level up from Apprentice all the way to Merlin.",
+    placement:"bottom" },
+  { id:"cast",     target:"tgt-sidebar", title:"Cast Your Spell",
+    body:"Once all required layers are filled, the Cast button appears. Hit it to assemble your complete prompt — then copy it straight into any AI tool.",
+    placement:"right" },
+  { id:"done",     target:null,          title:"You're ready. ✦",
+    body:"Start by filling The Anchor — set the role you want the AI to inhabit. Your first cast earns 50 XP.",
+    placement:"center" },
+];
+
+function TutorialOverlay({ onDone, tutorialRefs }) {
+  const [step, setStep]         = useState(0);
+  const [spotRect, setSpotRect] = useState(null);
+  const [tipPos,   setTipPos]   = useState({ top:"50%", left:"50%", transform:"translate(-50%,-50%)" });
+
+  const cur = TUTORIAL_STEPS[step];
+  const isLast = step === TUTORIAL_STEPS.length - 1;
+
+  useEffect(() => {
+    if (!cur) return;
+    if (!cur.target) {
+      setSpotRect(null);
+      setTipPos({ top:"50%", left:"50%", transform:"translate(-50%,-50%)", arrowDir:null });
+      return;
+    }
+    const el = tutorialRefs.current?.[cur.target];
+    if (!el) {
+      setSpotRect(null);
+      setTipPos({ top:"50%", left:"50%", transform:"translate(-50%,-50%)", arrowDir:null });
+      return;
+    }
+    const r   = el.getBoundingClientRect();
+    const pad = 8;
+    setSpotRect({ top:r.top-pad, left:r.left-pad, width:r.width+pad*2, height:r.height+pad*2 });
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tw = Math.min(300, vw-32), th = 190;
+    let pos = {};
+    if (cur.placement==="bottom") {
+      pos = { top:r.bottom+16, left:Math.max(12, Math.min(r.left+r.width/2-tw/2, vw-tw-12)), arrowDir:"top" };
+    } else if (cur.placement==="right") {
+      pos = { top:Math.max(12, r.top+r.height/2-th/2), left:r.right+16, arrowDir:"left" };
+    } else if (cur.placement==="left") {
+      pos = { top:Math.max(12, r.top+r.height/2-th/2), left:r.left-tw-16, arrowDir:"right" };
+    } else {
+      pos = { top:"50%", left:"50%", transform:"translate(-50%,-50%)", arrowDir:null };
+    }
+    if (typeof pos.top==="number") pos.top = Math.max(12, Math.min(pos.top, vh-th-12));
+    setTipPos(pos);
+  }, [step]);
+
+  const ARROWS = {
+    top:    { position:"absolute", top:-7,  left:"50%", transform:"translateX(-50%)",  width:0, height:0, borderLeft:"7px solid transparent", borderRight:"7px solid transparent", borderBottom:"7px solid #a78bfa" },
+    bottom: { position:"absolute", bottom:-7,left:"50%",transform:"translateX(-50%)", width:0, height:0, borderLeft:"7px solid transparent", borderRight:"7px solid transparent", borderTop:"7px solid #a78bfa" },
+    left:   { position:"absolute", left:-7, top:"50%",  transform:"translateY(-50%)",  width:0, height:0, borderTop:"7px solid transparent", borderBottom:"7px solid transparent", borderRight:"7px solid #a78bfa" },
+    right:  { position:"absolute", right:-7,top:"50%",  transform:"translateY(-50%)",  width:0, height:0, borderTop:"7px solid transparent", borderBottom:"7px solid transparent", borderLeft:"7px solid #a78bfa" },
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9000, pointerEvents:"none" }}>
+      <style>{`@keyframes tipPop{from{opacity:0;transform:scale(0.93)}to{opacity:1;transform:scale(1)}}`}</style>
+
+      {/* Dark overlay with spotlight */}
+      <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"all" }} onClick={() => isLast ? onDone() : setStep(s=>s+1)}>
+        <defs>
+          <mask id="wp-spotlight">
+            <rect width="100%" height="100%" fill="white"/>
+            {spotRect && <rect x={spotRect.left} y={spotRect.top} width={spotRect.width} height={spotRect.height} rx="10" fill="black"/>}
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(0,0,0,0.75)" mask="url(#wp-spotlight)"/>
+      </svg>
+
+      {/* Spotlight glow ring */}
+      {spotRect && (
+        <div style={{ position:"absolute", top:spotRect.top, left:spotRect.left,
+          width:spotRect.width, height:spotRect.height, borderRadius:10,
+          border:"2px solid #a78bfa", pointerEvents:"none",
+          boxShadow:"0 0 0 4px #a78bfa22, 0 0 20px #a78bfa44",
+          transition:"all 0.3s ease" }}/>
+      )}
+
+      {/* Tooltip */}
+      <div style={{ position:"fixed", zIndex:9001, pointerEvents:"all",
+        width:Math.min(300, window.innerWidth-32),
+        ...(tipPos.transform
+          ? { top:tipPos.top, left:tipPos.left, transform:tipPos.transform }
+          : { top:tipPos.top, left:tipPos.left }),
+        background:C.surface, border:"1px solid #a78bfa55", borderRadius:16,
+        padding:"20px 22px", boxShadow:"0 8px 40px rgba(0,0,0,0.8)",
+        animation:"tipPop 0.2s ease" }}>
+
+        {tipPos.arrowDir && <div style={ARROWS[tipPos.arrowDir]}/>}
+
+        {/* Dots */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+          <div style={{ display:"flex", gap:4 }}>
+            {TUTORIAL_STEPS.map((_,i) => (
+              <div key={i} style={{ width:i===step?14:5, height:5, borderRadius:3, transition:"all 0.3s",
+                background:i===step?"#a78bfa":i<step?"#a78bfa55":"#2a2a3a" }}/>
+            ))}
+          </div>
+          <button onClick={e => { e.stopPropagation(); onDone(); }}
+            style={{ background:"none", border:"none", color:C.textDim, fontSize:10,
+              cursor:"pointer", fontFamily:"monospace", letterSpacing:1 }}>SKIP</button>
+        </div>
+
+        <div style={{ fontSize:15, color:C.text, marginBottom:8, lineHeight:1.4 }}>{cur.title}</div>
+        <div style={{ fontSize:12, color:"#8a8aaa", lineHeight:1.7, marginBottom:18 }}>{cur.body}</div>
+
+        <div style={{ display:"flex", gap:8 }}>
+          {step > 0 && (
+            <button onClick={e => { e.stopPropagation(); setStep(s=>s-1); }}
+              style={{ background:"none", border:`1px solid ${C.border2}`, borderRadius:8,
+                padding:"8px 14px", color:C.textMid, fontSize:10, cursor:"pointer",
+                fontFamily:"monospace", letterSpacing:1 }}>← BACK</button>
+          )}
+          <button onClick={e => { e.stopPropagation(); isLast ? onDone() : setStep(s=>s+1); }}
+            style={{ flex:1, background:"linear-gradient(135deg,#7b6cf6,#a78bfa)", border:"none",
+              borderRadius:8, padding:"9px 16px", color:"#fff", fontSize:11,
+              cursor:"pointer", fontFamily:"monospace", letterSpacing:2, fontWeight:"bold" }}>
+            {isLast ? "LET'S GO ✦" : "NEXT →"}
+          </button>
+        </div>
+        <div style={{ marginTop:10, textAlign:"center", fontSize:9, color:C.textDim,
+          fontFamily:"monospace", letterSpacing:1 }}>Click anywhere to advance</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── INTRO SCREEN ─────────────────────────────────────────────────────────────
 function IntroScreen({ onDone }) {
   const canvasRef   = useRef(null);
@@ -864,7 +1788,7 @@ function IntroScreen({ onDone }) {
               marginBottom:10,
               lineHeight:1.15,
             }}>
-              ⚗️ Wizards Studio
+              ⚗️ Wizards Playground
             </div>
 
             <div style={{
@@ -895,6 +1819,24 @@ function IntroScreen({ onDone }) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function PromptStudio() {
+  // ── AUTH GATE ───────────────────────────────────────────────────────────────
+  const [userEmail,   setUserEmail]   = useState(() => getActiveEmail());
+  const [showTutorial,setShowTutorial]= useState(false);
+  const [showBeta,    setShowBeta]    = useState(false);
+
+  const handleLogin = (email, isNew) => {
+    setUserEmail(email);
+    if (isNew) { setShowBeta(true); }  // new accounts: beta banner first
+    else if (!isTutorialDone(email)) { setShowTutorial(true); }
+  };
+
+  const handleLogout = () => {
+    clearActiveEmail();
+    setUserEmail(null);
+    setIntro(true);
+  };
+
+  // ── APP STATE ───────────────────────────────────────────────────────────────
   const [intro,     setIntro]     = useState(true);
   const [values,    setValues]    = useState({});
   const [active,    setActive]    = useState(0);
@@ -903,13 +1845,20 @@ export default function PromptStudio() {
   const [isMobile,  setIsMobile]  = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
   const [codexCat,  setCodexCat]  = useState("My Spells");
-  const [mySpells,  setMySpells]  = useState(loadSpells);
+  const [mySpells,  setMySpells]  = useState(() => userEmail ? loadSpells(userEmail) : []);
   const [saveOpen,  setSaveOpen]  = useState(false);
   const [saveForm,  setSaveForm]  = useState({ title:"", description:"", category:"Language Models" });
   const [toast,     setToast]     = useState(null);
   const [view,      setView]      = useState("builder");
-  const castRef      = useRef(false);
-  const saveTimerRef = useRef(null);
+  const [xp,        setXPState]   = useState(() => userEmail ? loadXPForUser(userEmail) : 0);
+  const [profile,   setProfile]   = useState(() => userEmail ? loadProfile(userEmail) : null);
+  const [levelUp,   setLevelUp]   = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const castRef          = useRef(false);
+  const saveTimerRef     = useRef(null);
+  const xpSectionsSeen   = useRef(new Set());
+  const allReqAwardedRef = useRef(false);
+  const tutorialRefs     = useRef({});
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -919,7 +1868,7 @@ export default function PromptStudio() {
   }, []);
 
   useEffect(() => {
-    const k = e => { if (e.key==="Escape") { setCodexOpen(false); setSaveOpen(false); } };
+    const k = e => { if (e.key==="Escape") { setCodexOpen(false); setSaveOpen(false); setSettingsOpen(false); } };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, []);
@@ -935,12 +1884,44 @@ export default function PromptStudio() {
   const quality = useMemo(() => scorePrompt(values, assembled, isImageMode), [assembled, isImageMode]);
 
   const showToast = (msg, color=C.green) => { setToast({msg,color}); setTimeout(()=>setToast(null),2400); };
-  const handleChange = (id, val) => setValues(v => ({...v,[id]:val}));
+
+  // ── XP award helper ────────────────────────────────────────────────────────
+  const awardXP = (amount) => {
+    setXPState(prev => {
+      const before = getRankInfo(prev);
+      const next   = prev + amount;
+      if (userEmail) saveXPForUser(userEmail, next);
+      const after  = getRankInfo(next);
+      // Trigger level-up modal if level crossed
+      if (after.current.level > before.current.level) {
+        setTimeout(() => setLevelUp(after), 300);
+      }
+      return next;
+    });
+  };
+
+  const handleChange = (id, val) => {
+    setValues(v => {
+      const updated = {...v, [id]: val};
+      // Award XP first time this section gets real content this spell
+      if (val.trim() && !xpSectionsSeen.current.has(id)) {
+        xpSectionsSeen.current.add(id);
+        awardXP(XP_REWARDS.fillSection);
+      }
+      return updated;
+    });
+  };
 
   const handleCast = () => {
     setShowFinal(true);
     if (!castRef.current) {
       castRef.current = true;
+      awardXP(XP_REWARDS.castSpell);
+      // bonus for completing all required sections (once per spell)
+      if (!allReqAwardedRef.current) {
+        allReqAwardedRef.current = true;
+        awardXP(XP_REWARDS.completeAllSections);
+      }
       saveTimerRef.current = setTimeout(() => setSaveOpen(true), 600);
     }
   };
@@ -983,7 +1964,10 @@ export default function PromptStudio() {
   const resetSpell = () => {
     clearTimeout(saveTimerRef.current);
     setValues({}); setActive(0); setShowFinal(false);
-    setSaveOpen(false); setView("builder"); castRef.current=false;
+    setSaveOpen(false); setView("builder");
+    castRef.current = false;
+    xpSectionsSeen.current = new Set();
+    allReqAwardedRef.current = false;
   };
 
   const loadSpell = (entry) => {
@@ -991,7 +1975,10 @@ export default function PromptStudio() {
     const merged = {};
     SECTIONS.forEach(s => { merged[s.id]=entry.spell?.[s.id]||""; });
     setValues(merged); setCodexOpen(false); setActive(0);
-    setShowFinal(false); setSaveOpen(false); setView("builder"); castRef.current=false;
+    setShowFinal(false); setSaveOpen(false); setView("builder");
+    castRef.current = false;
+    xpSectionsSeen.current = new Set(Object.keys(merged).filter(k => merged[k].trim()));
+    allReqAwardedRef.current = false;
   };
 
   const handleSave = () => {
@@ -1000,9 +1987,15 @@ export default function PromptStudio() {
     SECTIONS.forEach(s => { spell[s.id]=values[s.id]||""; });
     const entry = { title:saveForm.title, description:saveForm.description, category:saveForm.category, spell, savedAt:Date.now() };
     const updated = [entry,...mySpells];
-    setMySpells(updated); saveSpells(updated);
+    setMySpells(updated); if (userEmail) saveSpells(userEmail, updated);
     setSaveOpen(false); setSaveForm({title:"",description:"",category:"Language Models"});
+    awardXP(XP_REWARDS.saveToCodex);
     showToast("Saved to Codex ◈");
+  };
+
+  const handleSaveProfile = (updated) => {
+    saveProfile(userEmail, updated);
+    setProfile(updated);
   };
 
   const deleteMySpell = i => {
@@ -1010,9 +2003,16 @@ export default function PromptStudio() {
     setMySpells(updated); saveSpells(updated);
   };
 
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  if (!userEmail) return <AuthScreen onLogin={handleLogin} />;
+
   return (
     <>
       {intro && <IntroScreen onDone={() => setIntro(false)} />}
+      {showBeta && <BetaBanner onDismiss={() => { setShowBeta(false); if (!isTutorialDone(userEmail)) setShowTutorial(true); }} />}
+      {showTutorial && !showBeta && (
+        <TutorialOverlay tutorialRefs={tutorialRefs} onDone={() => { setTutorialDone(userEmail); setShowTutorial(false); }} />
+      )}
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"Georgia,serif", display:"flex", flexDirection:"column" }}>
       <style>{`
         *{box-sizing:border-box;}
@@ -1025,19 +2025,35 @@ export default function PromptStudio() {
       `}</style>
 
       {/* NAV */}
-      <nav style={{ height:52, background:C.surface, borderBottom:`1px solid ${C.border}`,
+      <nav style={{ height:56, background:C.surface, borderBottom:`1px solid ${C.border}`,
         display:"flex", alignItems:"center", justifyContent:"space-between",
         padding:"0 24px", flexShrink:0, position:"sticky", top:0, zIndex:20 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ fontSize:18, color:C.purple }}>⚗️</span>
           <div>
-            <div style={{ fontSize:16, color:C.text, fontStyle:"italic", letterSpacing:"-0.3px" }}>Wizards Studio</div>
-            <div style={{ fontSize:9, color:C.textMid, letterSpacing:3, fontFamily:"monospace", marginTop:1 }}>BY WIZARDS PLAYGROUND</div>
+            <div style={{ fontSize:16, color:C.text, fontStyle:"italic", letterSpacing:"-0.3px" }}>Wizards Playground</div>
+            <div style={{ fontSize:9, color:C.textMid, letterSpacing:3, fontFamily:"monospace", marginTop:1 }}>PROMPT STUDIO</div>
           </div>
+          <button onClick={() => setSettingsOpen(true)} title="Settings"
+            style={{ display:"flex", alignItems:"center", gap:8, background:"none",
+              border:`1px solid ${C.border2}`, borderRadius:20, cursor:"pointer",
+              padding:"4px 10px 4px 6px", transition:"border-color 0.2s" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor=C.border}
+            onMouseLeave={e => e.currentTarget.style.borderColor=C.border2}>
+            <span style={{ fontSize:22, lineHeight:1 }}>{profile?.avatar || "🧙"}</span>
+            {!isMobile && (
+              <span style={{ fontSize:11, color:C.textMid, fontFamily:"monospace", letterSpacing:1, maxWidth:90,
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {profile?.name || userEmail?.split("@")[0] || "Wizard"}
+              </span>
+            )}
+            <span style={{ fontSize:14, color:C.textDim, lineHeight:1 }}>⚙</span>
+          </button>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           {filled > 0 && (
-            <button onClick={() => setView(v=>v==="quality"?"builder":"quality")}
+            <button ref={el => tutorialRefs.current["tgt-quality"]=el}
+              onClick={() => setView(v=>v==="quality"?"builder":"quality")}
               style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 12px", borderRadius:8, cursor:"pointer",
                 background: view==="quality" ? `${quality.verdictColor}15` : "transparent",
                 border:`1px solid ${view==="quality" ? quality.verdictColor+"44" : C.border}`,
@@ -1057,7 +2073,11 @@ export default function PromptStudio() {
               <span style={{ fontSize:9, fontFamily:"monospace", letterSpacing:1, color:view==="quality"?quality.verdictColor:C.textMid }}>QUALITY</span>
             </button>
           )}
-          <button onClick={() => setCodexOpen(true)}
+          <div ref={el => tutorialRefs.current["tgt-xp"]=el}>
+            <XPBar xp={xp} isMobile={isMobile} />
+          </div>
+          <button ref={el => tutorialRefs.current["tgt-codex"]=el}
+            onClick={() => setCodexOpen(true)}
             style={{ background:codexOpen?C.surface2:"transparent", border:`1px solid ${codexOpen?C.border2:"transparent"}`,
               borderRadius:8, padding:"6px 14px", color:codexOpen?C.text:C.textMid,
               fontSize:10, cursor:"pointer", letterSpacing:1.5, fontFamily:"monospace" }}>
@@ -1086,16 +2106,18 @@ export default function PromptStudio() {
       </div>
 
       {/* MAIN */}
-      <div style={{ flex:1, display:"flex", overflow:"hidden", height:"calc(100vh - 54px)" }}>
+      <div style={{ flex:1, display:"flex", overflow:"hidden", height:"calc(100vh - 58px)" }}>
 
         {/* SIDEBAR — only shown on desktop */}
         {!isMobile && (
+          <div ref={el => tutorialRefs.current["tgt-sidebar"]=el} style={{display:"contents"}}>
           <Sidebar activeSecs={activeSecs} active={active} setActive={setActive}
             values={values} filled={filled} progress={progress} quality={quality}
             view={view} setView={setView} resetSpell={resetSpell} />
+          </div>
         )}
 
-        <div style={{ flex:1, overflowY:"auto" }}>
+        <div ref={el => tutorialRefs.current["tgt-layers"]=el} style={{ flex:1, overflowY:"auto" }}>
           {view==="quality"
             ? <QualityView quality={quality} activeSecs={activeSecs} allReqFilled={allReqFilled}
                 isMobile={isMobile} setActive={setActive} setView={setView} handleCast={handleCast} />
@@ -1109,6 +2131,9 @@ export default function PromptStudio() {
       </div>
 
       {/* OVERLAYS */}
+      {settingsOpen && (
+        <SettingsPanel userEmail={userEmail} xp={xp} profile={profile} onSaveProfile={handleSaveProfile} onLogout={handleLogout} onClose={() => setSettingsOpen(false)} />
+      )}
       {codexOpen && (
         <CodexPanel codexCat={codexCat} setCodexCat={setCodexCat} mySpells={mySpells}
           deleteMySpell={deleteMySpell} loadSpell={loadSpell} setCodexOpen={setCodexOpen} isMobile={isMobile} />
@@ -1123,6 +2148,9 @@ export default function PromptStudio() {
           zIndex:100, boxShadow:"0 8px 30px rgba(0,0,0,0.4)", whiteSpace:"nowrap" }}>
           {toast.msg}
         </div>
+      )}
+      {levelUp && (
+        <LevelUpToast rankInfo={levelUp} onDone={() => setLevelUp(null)} />
       )}
     </div>
     </>
