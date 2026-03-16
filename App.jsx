@@ -148,12 +148,12 @@ function LandingPage({ onEnter }) {
   const ROADMAP = [
     { icon:"📜", color:C.purple, tag:"COMING NEXT",
       title:"The Grimoire",
-      desc:"Merlin's complete library of lessons on prompt engineering. Chapters, exercises, and incantations that teach through doing. The curriculum lives inside the Playground itself." },
+      desc:"The Playground's complete library of lessons on prompt engineering. Chapters, exercises, and incantations that teach through doing. The curriculum lives inside the Playground itself." },
     { icon:"🎓", color:C.pink, tag:"COMING NEXT",
       title:"Courses & Learning Paths",
       desc:"Four full courses — The AI Spellbook, Bottle Your Brilliance, Prompting Mastery, and Demystify AI. Structured learning with badges, completions, and XP rewards for every lesson." },
     { icon:"🗺️", color:C.gold, tag:"COMING NEXT",
-      title:"Merlin's School of Wizardry",
+      title:"Wizards Playground: School of Prompt Wizardry",
       desc:"A fully gamified learning world. Classrooms. Study halls. Quests. Challenge rooms. The entire Playground reimagined as a school where every lesson is an adventure." },
     { icon:"🌐", color:C.green, tag:"THE COMMONS",
       title:"The Spell Exchange",
@@ -290,28 +290,28 @@ function LandingPage({ onEnter }) {
             WELCOME TO
           </div>
           <h1 style={{
-            fontSize:"clamp(36px, 6vw, 76px)",
-            color:C.text,
-            fontStyle:"italic",
-            letterSpacing:"-2px",
-            lineHeight:1.1,
-            margin:0,
-            textShadow:"0 0 60px rgba(167,139,250,0.3), 0 0 120px rgba(167,139,250,0.1)",
-          }}>
-            Merlin's School
-          </h1>
-          <h1 style={{
-            fontSize:"clamp(36px, 6vw, 76px)",
-            background:"linear-gradient(135deg, #a78bfa, #f472b6, #fbbf24)",
+            fontSize:"clamp(32px, 5.5vw, 72px)",
+            background:"linear-gradient(135deg, #e8e4d9 20%, #a78bfa 60%, #f472b6 100%)",
             WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
             backgroundClip:"text",
             fontStyle:"italic",
             letterSpacing:"-2px",
-            lineHeight:1.1,
-            margin:"4px 0 0",
+            lineHeight:1.05,
+            margin:0,
           }}>
-            of Wizardry
+            Wizards Playground
           </h1>
+          <h2 style={{
+            fontSize:"clamp(14px, 2vw, 20px)",
+            color:C.textMid,
+            fontStyle:"normal",
+            letterSpacing:6,
+            fontFamily:"monospace",
+            fontWeight:"normal",
+            margin:"10px 0 0",
+          }}>
+            SCHOOL OF PROMPT WIZARDRY
+          </h2>
         </div>
 
         {/* Sub brand */}
@@ -322,7 +322,7 @@ function LandingPage({ onEnter }) {
         }}>
           <div style={{ fontSize:13, color:C.textMid, letterSpacing:4,
             fontFamily:"monospace", marginTop:8 }}>
-            ⚗️ WIZARDS PLAYGROUND · PROMPT STUDIO
+            ⚗️ SCHOOL OF PROMPT WIZARDRY
           </div>
         </div>
 
@@ -342,7 +342,7 @@ function LandingPage({ onEnter }) {
             fontStyle:"italic",
           }}>
             The world's first gamified school for prompt engineering — where spells are prompts,
-            lessons are quests, and every word you write brings you closer to Merlin.
+            lessons are quests, and every word you write brings you closer to mastery.
           </p>
         </div>
 
@@ -552,7 +552,7 @@ function LandingPage({ onEnter }) {
         <Divider color={C.purple} />
         <div style={{ marginTop:60 }}>
           <div style={{ fontSize:11, color:C.textDim, fontFamily:"monospace",
-            letterSpacing:4, marginBottom:32 }}>FROM THE HEADMASTER'S DESK</div>
+            letterSpacing:4, marginBottom:32 }}>FROM THE PLAYGROUND</div>
 
           <blockquote style={{ margin:0, padding:0 }}>
             <p style={{ fontSize:"clamp(18px,2.5vw,26px)", color:C.text,
@@ -566,7 +566,7 @@ function LandingPage({ onEnter }) {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14 }}>
               <div style={{ width:48, height:1, background:`linear-gradient(90deg, transparent, ${C.purple}44)` }} />
               <span style={{ fontSize:12, color:C.textMid, fontFamily:"monospace", letterSpacing:2 }}>
-                MERLIN · HEADMASTER
+                WIZARDS PLAYGROUND · HEADMASTER
               </span>
               <div style={{ width:48, height:1, background:`linear-gradient(90deg, ${C.purple}44, transparent)` }} />
             </div>
@@ -638,7 +638,7 @@ function LandingPage({ onEnter }) {
           <p style={{ fontSize:15, color:C.textMid, maxWidth:500,
             margin:"16px auto 44px", lineHeight:1.8, fontStyle:"italic" }}>
             The school is open. The library is stocked.
-            Every wizard who has ever reached Merlin started exactly here.
+            Every wizard who has ever reached mastery started exactly here.
           </p>
           <button className="land-btn-primary"
             style={{ fontSize:14, padding:"18px 52px" }}
@@ -668,7 +668,7 @@ function LandingPage({ onEnter }) {
         </div>
         <div style={{ fontSize:10, color:C.textDim, fontFamily:"monospace",
           letterSpacing:2 }}>
-          MERLIN'S SCHOOL OF WIZARDRY · PROMPT STUDIO
+          WIZARDS PLAYGROUND · SCHOOL OF PROMPT WIZARDRY
         </div>
         <button onClick={onEnter}
           style={{ background:"none", border:"none", color:C.textMid,
